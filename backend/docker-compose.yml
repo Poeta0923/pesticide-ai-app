@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: pesticide-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pesticide_db:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: pesticide-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - pesticide_redis:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  pesticide_db:
+  pesticide_redis:
