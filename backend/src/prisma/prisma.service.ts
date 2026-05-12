@@ -1,5 +1,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
+import { Pool } from 'pg';
 
 /**
  * NestJS DI를 통해 PrismaClient 싱글턴을 관리하는 서비스.
@@ -7,6 +9,12 @@ import { PrismaClient } from '../../generated/prisma/client';
  */
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+  constructor() {
+    // Rust 엔진 대신 pg 드라이버 어댑터를 사용한다 (Prisma 6 권장 방식).
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    super({ adapter: new PrismaPg(pool) });
+  }
+
   async onModuleInit() {
     await this.$connect();
   }
