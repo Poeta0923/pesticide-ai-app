@@ -16,14 +16,15 @@ model User {
   id            String    @id @default(cuid())
   name          String
   email         String?   @unique
-  emailVerified DateTime?
+  emailVerified DateTime? @map("email_verified")
   // Credentials 로그인 전용 (OAuth 유저는 null)
   password      String?
   accounts      Account[]
   role          Role      @default(USER)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("users")
 }
 
 enum Role {
@@ -32,23 +33,24 @@ enum Role {
 }
 
 model Account {
-  userId            String
+  userId            String  @map("user_id")
   provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
+  providerAccountId String  @map("provider_account_id")
+  refreshToken      String? @map("refresh_token")
+  accessToken       String? @map("access_token")
+  expiresAt         Int?    @map("expires_at")
+  tokenType         String? @map("token_type")
   scope             String?
-  id_token          String?
-  session_state     String?
+  idToken           String? @map("id_token")
+  sessionState      String? @map("session_state")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([provider, providerAccountId])
+  @@map("accounts")
 }
 
 model VerificationToken {
@@ -58,6 +60,7 @@ model VerificationToken {
   type       VerificationTokenType
 
   @@id([identifier, token])
+  @@map("verification_tokens")
 }
 
 enum VerificationTokenType {
