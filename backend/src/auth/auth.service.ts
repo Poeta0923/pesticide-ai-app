@@ -54,6 +54,15 @@ export class AuthService {
       where: { identifier: email, type: 'EMAIL_VERIFICATION' },
     });
 
+    await this.prisma.verificationToken.create({
+      data: {
+        identifier: email,
+        token,
+        expires,
+        type: 'EMAIL_VERIFICATION',
+      },
+    });
+
     await this.mail.sendVerificationEmail(email, name, token);
   }
 }
