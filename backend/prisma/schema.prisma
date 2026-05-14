@@ -19,11 +19,12 @@ model User {
   emailVerified DateTime? @map("email_verified")
   // Credentials 로그인 전용 (OAuth 유저는 null)
   password      String?
-  accounts      Account[]
   role          Role      @default(USER)
+  accounts      Account[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+
   @@map("users")
 }
 
@@ -36,12 +37,12 @@ model Account {
   userId            String  @map("user_id")
   provider          String
   providerAccountId String  @map("provider_account_id")
-  refreshToken      String? @map("refresh_token")
-  accessToken       String? @map("access_token")
+  refreshToken      String? @map("refresh_token") @db.Text
+  accessToken       String? @map("access_token") @db.Text
   expiresAt         Int?    @map("expires_at")
   tokenType         String? @map("token_type")
   scope             String?
-  idToken           String? @map("id_token")
+  idToken           String? @map("id_token") @db.Text
   sessionState      String? @map("session_state")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -58,6 +59,8 @@ model VerificationToken {
   token      String
   expires    DateTime
   type       VerificationTokenType
+
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@id([identifier, token])
   @@map("verification_tokens")
