@@ -99,4 +99,20 @@ export class AuthService {
 
     return { message: '이메일 인증이 완료되었습니다.' };
   }
+
+  async resendVerification(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      return { message: '인증 메일이 재발송되었습니다.' };
+    }
+
+    if (user.emailVerified) {
+      throw new BadRequestException('이미 인증된 계정입니다.');
+    }
+
+    await this.sendVerificationEmail(user.email!, user.name);
+
+    return { message: '인증 메일이 재발송되었습니다.' };
+  }
 }
