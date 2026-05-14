@@ -1,4 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -64,5 +68,35 @@ export class AuthService {
     });
 
     await this.mail.sendVerificationEmail(email, name, token);
+  }
+
+  async verifyModel(token: string) {
+    const record = await this.prisma.verificationToken.findFirst({
+      where: { token, type: 'EMAIL_VERIFICATION' },
+    });
+
+    if (!record) {
+      throw new BadRequestException('유효하지 않은 토큰입니다.');
+    }
+
+    if (record.expires < new Date()) {
+      await this.prisma.verificationToken.delete({
+        where: { identifier_token: { identifier: record.identifier, token } },
+      });
+      throw new BadRequestException(
+        '만료된 토큰입니다. 인증 메일을 재발송해주세요.',
+      );
+    }
+
+    await this.prisma.user.update({
+      where: { email: record.identifier },
+      data: { emailVerified: new Date() },
+    });
+
+    await this.prisma.verificationToken.delete({
+      where: { identifier_token: { identifier: record.identifier, token } },
+    });
+
+    return { message: '이메일 인증이 완료되었습니다.' };
   }
 }
