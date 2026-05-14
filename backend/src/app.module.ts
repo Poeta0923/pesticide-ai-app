@@ -7,7 +7,12 @@ import { MailModule } from './mail/mail.module';
 import { AuthModule } from './auth/auth.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, MailModule, AuthModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    MailModule,
+    AuthModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
