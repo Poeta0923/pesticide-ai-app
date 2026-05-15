@@ -12,60 +12,61 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Auth.js v5 Prisma 어댑터 공식 스키마
-// https://authjs.dev/getting-started/adapters/prisma
-// Credentials 로그인을 위해 password 필드 추가
-
 model User {
   id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
+  name          String
+  email         String?   @unique
+  emailVerified DateTime? @map("email_verified")
   // Credentials 로그인 전용 (OAuth 유저는 null)
   password      String?
+  role          Role      @default(USER)
   accounts      Account[]
-  sessions      Session[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+enum Role {
+  USER
+  ADMIN
 }
 
 model Account {
-  userId            String
-  type              String
+  userId            String  @map("user_id")
   provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
+  providerAccountId String  @map("provider_account_id")
+  refreshToken      String? @map("refresh_token") @db.Text
+  accessToken       String? @map("access_token") @db.Text
+  expiresAt         Int?    @map("expires_at")
+  tokenType         String? @map("token_type")
   scope             String?
-  id_token          String?
-  session_state     String?
+  idToken           String? @map("id_token") @db.Text
+  sessionState      String? @map("session_state")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([provider, providerAccountId])
-}
-
-model Session {
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  @@map("accounts")
 }
 
 model VerificationToken {
   identifier String
   token      String
   expires    DateTime
+  type       VerificationTokenType
+
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@id([identifier, token])
+  @@map("verification_tokens")
+}
+
+enum VerificationTokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
 }
