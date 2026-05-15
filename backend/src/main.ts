@@ -22,8 +22,8 @@ async function bootstrap() {
 
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
-      .setTitle('API 문서')
-      .setDescription('API 설명')
+      .setTitle('Pesticide API')
+      .setDescription('Pesticide API 문서입니다.')
       .setVersion('1.0')
       .addBearerAuth(
         {
