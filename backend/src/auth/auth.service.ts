@@ -2,6 +2,8 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
@@ -11,9 +13,11 @@ import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
-    private mail: MailService,
+    private readonly mail: MailService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -23,13 +27,17 @@ export class AuthService {
 
     if (existing) {
       if (existing.emailVerified) {
-        throw new ConflictException('이미 가입된 이메일입니다.');
+        throw new ConflictException({
+          message: '이미 가입된 이메일입니다.',
+          code: 'EMAIL_ALREADY_VERIFIED',
+        });
       }
 
-      return {
-        message: '이미 가입된 이메일입니다. 인증 메일을 재발송하시겠습니까?',
-        requireResend: true,
-      };
+      throw new ConflictException({
+        message: '이미 가입 신청된 이메일입니다. 인증 메일을 재발송하시겠습니까?',
+        code: 'EMAIL_PENDING_VERIFICATION',
+        action: 'RESEND_VERIFICATION',
+      });
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
@@ -42,11 +50,22 @@ export class AuthService {
       },
     });
 
-    await this.sendVerificationEmail(user.email!, user.name);
+    try {
+      await this.sendVerificationEmail(user.email!, user.name);
+    } catch (error) {
+      this.logger.error(
+        `Verification email failed for ${user.email}`,
+        error instanceof Error ? error.stack : error,
+      );
+      return {
+        message:
+          '회원가입은 완료되었으나 이메일 발송에 실패했습니다. 인증 메일 재발송을 요청해주세요.',
+        action: 'RESEND_VERIFICATION',
+      };
+    }
 
     return {
-      message:
-        '회원가입이 완료되었습니다. 이메일을 확인해 인증을 완료해주세요.',
+      message: '회원가입이 완료되었습니다. 이메일을 확인해 인증을 완료해주세요.',
     };
   }
 
@@ -59,18 +78,13 @@ export class AuthService {
     });
 
     await this.prisma.verificationToken.create({
-      data: {
-        identifier: email,
-        token,
-        expires,
-        type: 'EMAIL_VERIFICATION',
-      },
+      data: { identifier: email, token, expires, type: 'EMAIL_VERIFICATION' },
     });
 
     await this.mail.sendVerificationEmail(email, name, token);
   }
 
-  async verifyModel(token: string) {
+  async verifyEmail(token: string) {
     const record = await this.prisma.verificationToken.findFirst({
       where: { token, type: 'EMAIL_VERIFICATION' },
     });
@@ -111,7 +125,17 @@ export class AuthService {
       throw new BadRequestException('이미 인증된 계정입니다.');
     }
 
-    await this.sendVerificationEmail(user.email!, user.name);
+    try {
+      await this.sendVerificationEmail(user.email!, user.name);
+    } catch (error) {
+      this.logger.error(
+        `Verification email resend failed for ${user.email}`,
+        error instanceof Error ? error.stack : error,
+      );
+      throw new InternalServerErrorException(
+        '인증 메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.',
+      );
+    }
 
     return { message: '인증 메일이 재발송되었습니다.' };
   }

@@ -17,7 +17,7 @@ export class AuthController {
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
   async verifyEmail(@Body() dto: VerifyEmailDto) {
-    return this.authService.verifyModel(dto.token);
+    return this.authService.verifyEmail(dto.token);
   }
 
   @Post('resend-verification')
