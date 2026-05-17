@@ -25,6 +25,7 @@ export class AuthController {
   }
 
   @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: '이메일 인증' })
   @ApiOkResponse({
@@ -35,6 +36,7 @@ export class AuthController {
   }
 
   @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: '이메일 재발송' })
   @ApiOkResponse({description: '이메일 재발송 성공'})
