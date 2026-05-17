@@ -1,0 +1,62 @@
+services:
+  prometheus:
+    # v2.54.1: prom-client@15, @willsoto/nestjs-prometheus@6와 검증된 LTS 라인.
+    # v3는 OTLP 수신기 등이 추가됐으나 로컬 dev에서는 불필요.
+    image: prom/prometheus:v2.54.1
+    container_name: pesticide-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      # 로컬 dev는 7일 보존이면 충분 (기본값 15d는 디스크 낭비)
+      - "--storage.tsdb.retention.time=7d"
+      # HTTP POST /-/reload 로 재시작 없이 설정 리로드 가능
+      - "--web.enable-lifecycle"
+    extra_hosts:
+      # macOS에서는 자동이지만 Linux에서도 host 접근 보장하기 위해 명시
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  loki:
+    # v3.2.0: TSDB 인덱스가 기본값(v2 boltdb_shipper 대체)으로 쿼리 성능 향상.
+    # v3.2는 v3.0 초기 버그가 패치된 안정 버전.
+    image: grafana/loki:3.2.0
+    container_name: pesticide-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/loki-config.yml
+    restart: unless-stopped
+
+  grafana:
+    # v11.3.0: Explore Logs(Loki 통합 UI), Scenes 기반 대시보드 등 v11 주요 개선 포함.
+    image: grafana/grafana:11.3.0
+    container_name: pesticide-grafana
+    ports:
+      # 3001로 노출: Next.js dev 서버(3000)와 충돌 방지
+      - "3001:3000"
+    environment:
+      # 로컬 dev: 매번 로그인하는 번거로움 없이 바로 대시보드 접근
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+
+volumes:
+  # Named Volume: docker compose down 후에도 데이터 유지
+  # 완전 초기화 필요 시: docker compose down -v
+  prometheus_data:
+  loki_data:
+  grafana_data:

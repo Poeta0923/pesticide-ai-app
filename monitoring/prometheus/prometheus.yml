@@ -1,0 +1,31 @@
+global:
+  # 15s: 로컬 dev에서 충분히 실시간에 가까운 간격 (5s는 불필요한 부하)
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "nestjs-backend"
+    # host.docker.internal: 컨테이너에서 호스트 머신을 가리키는 특수 DNS.
+    # NestJS는 포트 8000에서 Docker 외부(호스트)에서 직접 실행 중이므로 이 주소로 접근.
+    # /metrics 엔드포인트는 PrometheusModule.register() 등록 후 활성화됨.
+    static_configs:
+      - targets: ["host.docker.internal:8000"]
+    metrics_path: /metrics
+    relabel_configs:
+      - target_label: service
+        replacement: nestjs-backend
+
+  # postgres_exporter 추가 시 주석 해제
+  # - job_name: "postgres"
+  #   static_configs:
+  #     - targets: ["host.docker.internal:9187"]
+
+  # redis_exporter 추가 시 주석 해제
+  # - job_name: "redis"
+  #   static_configs:
+  #     - targets: ["host.docker.internal:9121"]
