@@ -3,7 +3,8 @@ auth_enabled: false
 
 server:
   http_listen_port: 3100
-  # gRPC는 클러스터 내부 통신용. 단일 인스턴스이므로 0으로 설정해 비활성화
+  # 단일 인스턴스(single-binary mode)에서도 내부 컴포넌트 간 통신에 gRPC가 필요함.
+  # docker-compose에서 외부로 publish하지 않으므로 컨테이너 외부 노출은 없음.
   grpc_listen_port: 9096
 
 common:

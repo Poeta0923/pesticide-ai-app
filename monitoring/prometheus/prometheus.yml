@@ -16,9 +16,6 @@ scrape_configs:
     static_configs:
       - targets: ["host.docker.internal:8000"]
     metrics_path: /metrics
-    relabel_configs:
-      - target_label: service
-        replacement: nestjs-backend
 
   # postgres_exporter 추가 시 주석 해제
   # - job_name: "postgres"
