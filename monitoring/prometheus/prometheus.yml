@@ -17,12 +17,12 @@ scrape_configs:
       - targets: ["host.docker.internal:8000"]
     metrics_path: /metrics
 
-  # postgres_exporter 추가 시 주석 해제
-  # - job_name: "postgres"
-  #   static_configs:
-  #     - targets: ["host.docker.internal:9187"]
+  - job_name: "postgres"
+    # backend/docker-compose.yml 의 postgres-exporter 컨테이너가 호스트 9187에 publish
+    static_configs:
+      - targets: ["host.docker.internal:9187"]
 
-  # redis_exporter 추가 시 주석 해제
-  # - job_name: "redis"
-  #   static_configs:
-  #     - targets: ["host.docker.internal:9121"]
+  - job_name: "redis"
+    # backend/docker-compose.yml 의 redis-exporter 컨테이너가 호스트 9121에 publish
+    static_configs:
+      - targets: ["host.docker.internal:9121"]
