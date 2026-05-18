@@ -20,6 +20,32 @@ services:
       - pesticide_redis:/data
     command: redis-server --appendonly yes
 
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: pesticide-postgres-exporter
+    ports:
+      - "9187:9187"
+    environment:
+      # 컨테이너 내부에서 postgres 컨테이너에 접근하므로 host는 compose 서비스명 "postgres"
+      # 중요 정보(user/password/db)는 .env 변수 그대로 참조
+      # sslmode=disable: 로컬 dev에서 SSL 미사용
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.62.0
+    container_name: pesticide-redis-exporter
+    ports:
+      - "9121:9121"
+    environment:
+      # 컨테이너 내부에서 redis 컨테이너에 접근. 비밀번호 없으므로 단순 형식
+      REDIS_ADDR: "redis://redis:6379"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
 volumes:
   pesticide_db:
   pesticide_redis:

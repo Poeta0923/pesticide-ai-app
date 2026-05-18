@@ -1,0 +1,29 @@
+apiVersion: 1
+
+# Grafana 시작 시 자동으로 데이터소스를 등록 (UI에서 수동 설정 불필요)
+datasources:
+  - name: Prometheus
+    type: prometheus
+    # 대시보드 JSON에서 안정적으로 참조하기 위한 고정 uid (생략 시 랜덤 uid 생성)
+    uid: prometheus
+    # proxy: Grafana 서버가 중계. direct 방식은 CORS 문제가 발생할 수 있어 proxy 권장
+    access: proxy
+    url: http://prometheus:9090
+    # 새 패널 생성 시 자동 선택되는 기본 데이터소스
+    isDefault: true
+    jsonData:
+      # POST 방식: 긴 PromQL 쿼리도 처리 가능 (GET의 URL 길이 제한 우회)
+      httpMethod: POST
+      # 스크레이핑 간격과 일치시켜 Grafana가 최소 쿼리 간격 힌트를 올바르게 표시
+      timeInterval: "15s"
+    editable: true
+
+  - name: Loki
+    type: loki
+    uid: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      # 한 번에 가져오는 최대 로그 수. 로컬 dev에서 1000줄이면 충분
+      maxLines: 1000
+    editable: true
