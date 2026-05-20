@@ -1,0 +1,81 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+
+  # GitHub Actions 화면에서 수동으로 실행할 수 있게 함
+  workflow_dispatch:
+
+# 저장소 내용을 읽는 데 필요한 최소 권한만 부여
+permissions:
+  contents: read
+
+# 같은 브랜치나 PR에서 새 커밋이 올라오면 이전 CI 실행을 취소
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend CI
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        # 모든 shell 명령을 NestJS 백엔드 프로젝트 디렉토리 기준으로 실행
+        working-directory: backend
+
+    steps:
+      # 저장소 코드를 GitHub Actions runner로 가져옴
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      # 의존성 자동 설치 없이 pnpm 패키지 매니저만 설치
+      - name: pnpm 설정
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      # Node.js 22를 설치하고 백엔드 lockfile 기준으로 pnpm store 캐시를 활성화
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      # pnpm-lock.yaml에 고정된 버전 그대로 의존성을 설치
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      # prisma/schema.prisma를 기반으로 Prisma Client를 생성
+      # generate는 DB에 연결하지 않으므로 더미 DATABASE_URL로 충분함
+      - name: Prisma 클라이언트 생성
+        run: pnpm exec prisma generate
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+
+      # 파일을 수정하지 않고 TypeScript 소스를 ESLint로 검사
+      - name: ESLint 검사
+        run: pnpm lint:check
+
+      # 컴파일 결과물을 만들지 않고 TypeScript 타입 오류만 검사
+      - name: 타입 체크
+        run: pnpm exec tsc --noEmit
+
+      # NestJS 백엔드가 프로덕션 빌드 가능한지 검증
+      - name: 빌드
+        run: pnpm build
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
