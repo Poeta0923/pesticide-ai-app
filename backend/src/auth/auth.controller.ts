@@ -39,7 +39,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: '이메일 재발송' })
-  @ApiOkResponse({description: '이메일 재발송 성공'})
+  @ApiOkResponse({ description: '이메일 재발송 성공' })
   async resendVerification(@Body() dto: ResendVerificationDto) {
     return this.authService.resendVerification(dto.email);
   }
