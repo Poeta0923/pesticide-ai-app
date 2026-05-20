@@ -5,7 +5,7 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import bcrypt from 'bcrypt';
+import { hash } from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -34,13 +34,14 @@ export class AuthService {
       }
 
       throw new ConflictException({
-        message: '이미 가입 신청된 이메일입니다. 인증 메일을 재발송하시겠습니까?',
+        message:
+          '이미 가입 신청된 이메일입니다. 인증 메일을 재발송하시겠습니까?',
         code: 'EMAIL_PENDING_VERIFICATION',
         action: 'RESEND_VERIFICATION',
       });
     }
 
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const hashedPassword = await hash(dto.password, 10);
 
     const user = await this.prisma.user.create({
       data: {
@@ -65,7 +66,8 @@ export class AuthService {
     }
 
     return {
-      message: '회원가입이 완료되었습니다. 이메일을 확인해 인증을 완료해주세요.',
+      message:
+        '회원가입이 완료되었습니다. 이메일을 확인해 인증을 완료해주세요.',
     };
   }
 
