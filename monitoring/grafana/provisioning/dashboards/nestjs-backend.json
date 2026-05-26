@@ -4,7 +4,7 @@
   "tags": ["pesticide", "nestjs"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "10s",
   "time": { "from": "now-15m", "to": "now" },
   "panels": [
@@ -169,10 +169,82 @@
       }
     },
     {
+      "id": 9,
+      "type": "timeseries",
+      "title": "HTTP 요청률",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{app=\"pesticide-backend\"}[5m])) by (method, route, status_code)",
+          "refId": "A",
+          "legendFormat": "{{method}} {{route}} {{status_code}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "HTTP p95 지연시간",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{app=\"pesticide-backend\"}[5m])) by (le, method, route))",
+          "refId": "A",
+          "legendFormat": "p95 {{method}} {{route}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "HTTP 5xx 에러율",
+      "gridPos": { "x": 0, "y": 28, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{app=\"pesticide-backend\",status_code=~\"5..\"}[5m])) by (method, route) / clamp_min(sum(rate(http_requests_total{app=\"pesticide-backend\"}[5m])) by (method, route), 1e-9)",
+          "refId": "A",
+          "legendFormat": "{{method}} {{route}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit" },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "HTTP In-flight 요청",
+      "gridPos": { "x": 12, "y": 28, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(http_requests_in_flight{app=\"pesticide-backend\"}) by (method, route)",
+          "refId": "A",
+          "legendFormat": "{{method}} {{route}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      }
+    },
+    {
       "id": 8,
       "type": "logs",
       "title": "Backend 로그",
-      "gridPos": { "x": 0, "y": 20, "w": 24, "h": 12 },
+      "gridPos": { "x": 0, "y": 36, "w": 24, "h": 12 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
