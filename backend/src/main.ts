@@ -3,7 +3,9 @@ import { AppModule } from './app.module';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
+import { shouldBlockMetricsInProduction } from './common/metrics/metrics-production-access';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -20,6 +22,22 @@ async function bootstrap() {
         process.env.NODE_ENV === 'production' ? undefined : false,
     }),
   );
+
+  // 운영에서는 METRICS_ENABLED_IN_PRODUCTION=true가 없으면 /metrics를 기본 차단한다.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (
+      shouldBlockMetricsInProduction({
+        nodeEnv: process.env.NODE_ENV,
+        metricsEnabledInProduction: process.env.METRICS_ENABLED_IN_PRODUCTION,
+        path: req.path,
+      })
+    ) {
+      res.status(404).send('Not Found');
+      return;
+    }
+
+    next();
+  });
 
   app.enableCors({
     origin:
