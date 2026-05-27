@@ -1,24 +1,51 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
-import { hash } from 'bcrypt';
-import { randomBytes } from 'crypto';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { compare, hash } from 'bcrypt';
+import { randomBytes, randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { RegisterDto } from './dto/register.dto';
+import type { AuthenticatedUser } from './types/authenticated-user.type';
+import type {
+  AuthTokenPayload,
+  AuthTokenType,
+} from './types/auth-token-payload.type';
+
+const ACCESS_TOKEN_EXPIRES_IN = '1h';
+const REFRESH_TOKEN_EXPIRES_IN = '7d';
+
+type LoginResult = {
+  accessToken: string;
+  refreshToken: string;
+  user: AuthenticatedUser;
+};
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  private readonly accessTokenSecret: string;
+  private readonly refreshTokenSecret: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
-  ) {}
+    private readonly jwt: JwtService,
+    private readonly config: ConfigService,
+  ) {
+    this.accessTokenSecret =
+      this.config.getOrThrow<string>('JWT_ACCESS_SECRET');
+    this.refreshTokenSecret =
+      this.config.getOrThrow<string>('JWT_REFRESH_SECRET');
+  }
 
   async register(dto: RegisterDto) {
     const existing = await this.prisma.user.findUnique({
@@ -140,5 +167,82 @@ export class AuthService {
     }
 
     return { message: '인증 메일이 재발송되었습니다.' };
+  }
+
+  async validateCredentials(
+    email: string,
+    password: string,
+  ): Promise<AuthenticatedUser> {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        password: true,
+        role: true,
+        emailVerified: true,
+      },
+    });
+
+    if (!user?.email || !user.password) {
+      this.throwInvalidCredentials();
+    }
+
+    const passwordMatches = await compare(password, user.password);
+    if (!passwordMatches) {
+      this.throwInvalidCredentials();
+    }
+
+    if (!user.emailVerified) {
+      throw new ForbiddenException({
+        message: '이메일 인증이 필요합니다.',
+        code: 'EMAIL_NOT_VERIFIED',
+        action: 'RESEND_VERIFICATION',
+      });
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    };
+  }
+
+  async login(user: AuthenticatedUser): Promise<LoginResult> {
+    const [accessToken, refreshToken] = await Promise.all([
+      this.signToken(user, 'access'),
+      this.signToken(user, 'refresh'),
+    ]);
+
+    return { accessToken, refreshToken, user };
+  }
+
+  private async signToken(user: AuthenticatedUser, tokenType: AuthTokenType) {
+    const payload: AuthTokenPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      jti: randomUUID(),
+      tokenType,
+    };
+
+    return this.jwt.signAsync(payload, {
+      secret:
+        tokenType === 'access'
+          ? this.accessTokenSecret
+          : this.refreshTokenSecret,
+      expiresIn:
+        tokenType === 'access'
+          ? ACCESS_TOKEN_EXPIRES_IN
+          : REFRESH_TOKEN_EXPIRES_IN,
+    });
+  }
+
+  private throwInvalidCredentials(): never {
+    throw new UnauthorizedException(
+      '이메일 또는 비밀번호가 올바르지 않습니다.',
+    );
   }
 }
