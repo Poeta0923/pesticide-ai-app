@@ -19,9 +19,23 @@ import type {
   AuthTokenPayload,
   AuthTokenType,
 } from './types/auth-token-payload.type';
+import type { OAuthLoginInput } from './types/oauth-login-input.type';
 
 const ACCESS_TOKEN_EXPIRES_IN = '1h';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
+const USER_AUTH_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+} as const;
+
+type AuthUserRecord = {
+  id: string;
+  email: string | null;
+  name: string;
+  role: AuthenticatedUser['role'];
+};
 
 type LoginResult = {
   accessToken: string;
@@ -176,11 +190,8 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { email },
       select: {
-        id: true,
-        email: true,
-        name: true,
+        ...USER_AUTH_SELECT,
         password: true,
-        role: true,
         emailVerified: true,
       },
     });
@@ -208,6 +219,72 @@ export class AuthService {
       name: user.name,
       role: user.role,
     };
+  }
+
+  async validateOAuthLogin(input: OAuthLoginInput): Promise<AuthenticatedUser> {
+    if (!input.email || !input.emailVerified) {
+      throw new UnauthorizedException(
+        'OAuth 제공자에서 인증된 이메일을 확인할 수 없습니다.',
+      );
+    }
+
+    const accountWhere = {
+      provider_providerAccountId: {
+        provider: input.provider,
+        providerAccountId: input.providerAccountId,
+      },
+    };
+
+    const existingAccount = await this.prisma.account.findUnique({
+      where: accountWhere,
+      include: { user: { select: USER_AUTH_SELECT } },
+    });
+
+    if (existingAccount) {
+      await this.prisma.account.update({
+        where: accountWhere,
+        data: this.buildOAuthAccountUpdateData(input),
+      });
+
+      return this.toAuthenticatedUser(existingAccount.user);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const existingUser = await tx.user.findUnique({
+        where: { email: input.email! },
+        select: { ...USER_AUTH_SELECT, emailVerified: true },
+      });
+
+      if (existingUser) {
+        if (!existingUser.emailVerified) {
+          await tx.user.delete({ where: { id: existingUser.id } });
+        } else {
+          await tx.account.create({
+            data: {
+              userId: existingUser.id,
+              ...this.buildOAuthAccountCreateData(input),
+            },
+          });
+
+          return this.toAuthenticatedUser(existingUser);
+        }
+      }
+
+      const user = await tx.user.create({
+        data: {
+          email: input.email!,
+          name: input.name,
+          password: null,
+          emailVerified: new Date(),
+          accounts: {
+            create: this.buildOAuthAccountCreateData(input),
+          },
+        },
+        select: USER_AUTH_SELECT,
+      });
+
+      return this.toAuthenticatedUser(user);
+    });
   }
 
   async login(user: AuthenticatedUser): Promise<LoginResult> {
@@ -238,6 +315,47 @@ export class AuthService {
           ? ACCESS_TOKEN_EXPIRES_IN
           : REFRESH_TOKEN_EXPIRES_IN,
     });
+  }
+
+  private buildOAuthAccountCreateData(input: OAuthLoginInput) {
+    return {
+      provider: input.provider,
+      providerAccountId: input.providerAccountId,
+      accessToken: input.accessToken ?? null,
+      refreshToken: input.refreshToken ?? null,
+      expiresAt: input.expiresAt ?? null,
+      tokenType: input.tokenType ?? null,
+      scope: input.scope ?? null,
+      idToken: input.idToken ?? null,
+      sessionState: input.sessionState ?? null,
+    };
+  }
+
+  private buildOAuthAccountUpdateData(input: OAuthLoginInput) {
+    return {
+      accessToken: input.accessToken ?? undefined,
+      refreshToken: input.refreshToken ?? undefined,
+      expiresAt: input.expiresAt ?? undefined,
+      tokenType: input.tokenType ?? undefined,
+      scope: input.scope ?? undefined,
+      idToken: input.idToken ?? undefined,
+      sessionState: input.sessionState ?? undefined,
+    };
+  }
+
+  private toAuthenticatedUser(user: AuthUserRecord): AuthenticatedUser {
+    if (!user.email) {
+      throw new UnauthorizedException(
+        '인증 계정의 이메일을 확인할 수 없습니다.',
+      );
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    };
   }
 
   private throwInvalidCredentials(): never {
