@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
@@ -24,6 +25,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { LocalAuthGuard } from './guards/local-auth.guard';
+import { GoogleAuthGuard } from './guards/google-auth.guard';
 import type { AuthenticatedUser } from './types/authenticated-user.type';
 
 const REFRESH_TOKEN_COOKIE_NAME = 'refresh_token';
@@ -84,9 +86,32 @@ export class AuthController {
     @Req() req: AuthenticatedRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { refreshToken, ...responseBody } = await this.authService.login(
-      req.user,
-    );
+    return this.respondWithLogin(req.user, res);
+  }
+
+  @Get('google')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @UseGuards(GoogleAuthGuard)
+  @ApiOperation({ summary: 'Google OAuth 로그인 시작' })
+  googleLogin() {
+    return;
+  }
+
+  @Get('google/callback')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @UseGuards(GoogleAuthGuard)
+  @ApiOperation({ summary: 'Google OAuth 콜백' })
+  @ApiOkResponse({ description: 'Google OAuth 로그인 성공' })
+  async googleCallback(
+    @Req() req: AuthenticatedRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.respondWithLogin(req.user, res);
+  }
+
+  private async respondWithLogin(user: AuthenticatedUser, res: Response) {
+    const { refreshToken, ...responseBody } =
+      await this.authService.login(user);
 
     res.cookie(
       REFRESH_TOKEN_COOKIE_NAME,
